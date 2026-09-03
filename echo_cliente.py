@@ -1,40 +1,44 @@
 import socket
 import sys
 
-#garante que o host e a porta
+# Valida os argumentos da linha de comando
 if len(sys.argv) < 3:
+    print("[ERRO] Uso correto: python echo_cliente.py <nome_usuario> <host>")
     sys.exit(1)
-tela = sys.argv[1]
+
+nome_usuario = sys.argv[1]
 host = sys.argv[2]
-print(tela, host)
 porta = 4444
 
-#conecta com o servidor
+# Cria o socket e estabelece conexão com o servidor
 cliente = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-cliente.connect((host, porta))
-print(f'Acho que os cara tão no teto. (cliente {tela} conectado: {host},{porta})')
 
 try:
+    cliente.connect((host, porta))
+    print(f'[INFO] Conectado ao servidor {host}:{porta} como "{nome_usuario}".')
+
     while True:
-        #mensagem do usuário
-        mensagem = input('o que você quer falar? ')
+        # Entrada de comandos pelo usuário
+        mensagem = input('Digite um comando: ')
         
-        #enviando a mensagem
+        # Envia a mensagem ao servidor
         cliente.sendall(mensagem.encode('utf-8'))
         
-        if(mensagem.strip() == 'exit'):
-            print(f'vou sair daqui (cliente {tela} desconectado: {host},{porta})')
+        # Verifica solicitação de encerramento
+        if mensagem.strip() == 'exit':
+            print('[INFO] Encerrando sessão por comando do usuário.')
             break
         
-        #imprime a resposta do servidor
+        # Recebe e exibe a resposta do servidor
         resposta = cliente.recv(1024).decode('utf-8')
-        print(f'você escuta "{resposta}" vindo do teto')
-        
+        print(f'[RESPOSTA] {resposta}')
+
+except ConnectionRefusedError:
+    print(f'[ERRO] Não foi possível conectar ao servidor {host}:{porta}. Verifique se ele está ativo.')
+
 except (KeyboardInterrupt, EOFError):
-    #garante que o programa não quebre com ctrl+c ou ctrl+d
-    pass
+    print('\n[INFO] Encerramento solicitado pelo usuário (Ctrl+C / Ctrl+D).')
 
 finally:
-    #fecha a coneção
-    print('\nporque ele repete o que eu falo? Vou é sair daqui (cliente desconectado)') 
     cliente.close()
+    print('[INFO] Conexão finalizada com sucesso.')
