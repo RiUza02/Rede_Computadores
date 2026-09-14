@@ -46,9 +46,16 @@ Após a conexão, você verá o prompt "Digite um comando:". Utilize as instruç
   Exemplo: echo Olá, mundo!
   Retorno: Olá, mundo!
 
+- Enviar mensagem privada (Chat):
+Sintaxe: chat <nome_usuario> <mensagem>
+Exemplo: chat Rodrigo Olá Rodrigo, tudo bem?
+Retorno no remetente: Mensagem enviada para Rodrigo.
+Retorno no destinatário: Mensagem de Yuri: Olá Rodrigo, tudo bem?
+
 - Encerrar a sessão do cliente:
   Sintaxe: exit
   Retorno: Conexão finalizada com sucesso.
+  
 
 - Trata de Comandos Inválidos:
   Se você digitar qualquer frase sem o prefixo "echo " ou diferente de "exit", 

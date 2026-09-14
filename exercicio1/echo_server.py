@@ -1,74 +1,92 @@
 import socket
 import threading
+from comandos import processar_comando
+
+# Mapeamento dos clientes ativos {nome_cliente: socket_cliente}
+clientes = {}
+lock = threading.Lock()
+
 
 # Trata a conexão de cada cliente individualmente
-def tread(cliente, endereco):
+def tratar_cliente(cliente, endereco):
     print(f'[INFO] Cliente conectado com sucesso: {endereco}')
+    nome_cliente = None  # Inicializa o nome do cliente como None
 
     try:
+        # Recebe a primeira mensagem do cliente, que deve ser o nome de usuário
+        primeira_mensagem = cliente.recv(1024).decode('utf-8').strip()
+        if primeira_mensagem:
+            nome_cliente = primeira_mensagem
+            with lock:
+                clientes[nome_cliente] = cliente
+            print(f'[INFO] Nome do cliente registrado: {nome_cliente} para o endereço {endereco}')
+
         while True:
             mensagem = cliente.recv(1024).decode('utf-8')
-            
+
             # Trata encerramento silencioso da conexão
             if not mensagem:
                 print(f'[INFO] Conexão finalizada pelo cliente: {endereco}')
                 break
-            
-            # Comando de encerramento
-            if mensagem.strip() == 'exit':
-                print(f'[INFO] Cliente {endereco} enviou o comando de saída (exit).')
-                break
-            
-            # Comando de eco
-            elif mensagem.startswith('echo '):
-                conteudo = mensagem[5:]
-                print(f'[INFO] Mensagem processada para {endereco}: "{conteudo}"')
-                cliente.sendall(conteudo.encode('utf-8'))
 
-            elif mensagem.strip() == 'echo':
-                print(f'[INFO] Comando echo recebido de {endereco} sem conteúdo.')
-                cliente.sendall(''.encode('utf-8'))
-            
-            # Tratamento de erro para comandos desconhecidos
-            else:
-                print(f'[AVISO] Comando inválido recebido de {endereco}: "{mensagem}"')
-                resposta_erro = "ERRO: Comando não reconhecido. Sintaxe válida: 'echo <mensagem>' ou 'exit'."
-                cliente.sendall(resposta_erro.encode('utf-8'))
-    
+            # Processa o comando importado do módulo 'comandos'
+            continuar = processar_comando(
+                mensagem=mensagem,
+                cliente=cliente,
+                endereco=endereco,
+                nome_cliente=nome_cliente,
+                clientes=clientes,
+                lock=lock
+            )
+
+            # Se o comando retornou False (ex: 'exit'), encerra o loop da thread
+            if not continuar:
+                break
+
     except (ConnectionResetError, BrokenPipeError):
         print(f'[ERRO] Conexão perdida inesperadamente com o cliente: {endereco}')
     finally:
+        # Garante a remoção do cliente do dicionário ao desconectar
+        if nome_cliente:
+            with lock:
+                clientes.pop(nome_cliente, None)
         print(f'[INFO] Conexão encerrada e recursos liberados para: {endereco}')
         cliente.close()
 
 
 # Configuração do endereço e porta do servidor
-host = '127.0.0.1'
-porta = 4444
+HOST = '127.0.0.1'
+PORTA = 4444
 
-# Inicialização do socket TCP
-servidor = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-servidor.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-servidor.bind((host, porta))
-servidor.listen()
 
-print(f'[INFO] Servidor ativo e aguardando conexões em {host}:{porta}')
+def iniciar_servidor():
+    # Inicialização do socket TCP
+    servidor = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    servidor.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    servidor.bind((HOST, PORTA))
+    servidor.listen()
 
-try:
-    while True:
-        cliente, endereco = servidor.accept()
-        
-        # Aloca uma nova thread para o cliente aceito
-        treadCliente = threading.Thread(
-            target=tread,
-            args=(cliente, endereco),
-            daemon=True     
-        )
-        treadCliente.start()
+    print(f'[INFO] Servidor ativo e aguardando conexões em {HOST}:{PORTA}')
 
-except KeyboardInterrupt:
-    print('\n[INFO] Encerramento do servidor solicitado pelo administrador (Ctrl+C).')
+    try:
+        while True:
+            cliente, endereco = servidor.accept()
 
-finally:
-    print('[INFO] Servidor finalizado. Socket principal fechado.')
-    servidor.close()
+            # Aloca uma nova thread para o cliente aceito
+            thread_cliente = threading.Thread(
+                target=tratar_cliente,
+                args=(cliente, endereco),
+                daemon=True
+            )
+            thread_cliente.start()
+
+    except KeyboardInterrupt:
+        print('\n[INFO] Encerramento do servidor solicitado pelo administrador (Ctrl+C).')
+
+    finally:
+        print('[INFO] Servidor finalizado. Socket principal fechado.')
+        servidor.close()
+
+
+if __name__ == '__main__':
+    iniciar_servidor()

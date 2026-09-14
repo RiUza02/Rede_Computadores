@@ -1,5 +1,20 @@
 import socket
 import sys
+import threading
+
+def receber_mensagens(cliente):
+    while True:
+        try:
+            resposta = cliente.recv(1024).decode('utf-8')
+            if not resposta:
+                print("\n[INFO] Conexão encerrada pelo servidor.")
+                break
+            print(f"\n{resposta}")
+        except:
+            print("\n[ERRO] Conexão com o servidor foi perdida.")
+            break
+
+
 
 # Valida os argumentos da linha de comando
 if len(sys.argv) < 3:
@@ -16,6 +31,13 @@ cliente = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 try:
     cliente.connect((host, porta))
     print(f'[INFO] Conectado ao servidor {host}:{porta} como "{nome_usuario}".')
+    
+    # Envia o nome de usuário
+    cliente.sendall(nome_usuario.encode('utf-8'))
+    
+    # Inicia a thread para receber mensagens do servidor
+    threadEscuta = threading.Thread(target=receber_mensagens, args=(cliente,), daemon=True)
+    threadEscuta.start()
 
     while True:
         # Entrada de comandos pelo usuário
@@ -28,10 +50,6 @@ try:
         if mensagem.strip() == 'exit':
             print('[INFO] Encerrando sessão por comando do usuário.')
             break
-        
-        # Recebe e exibe a resposta do servidor
-        resposta = cliente.recv(1024).decode('utf-8')
-        print(f'[RESPOSTA] {resposta}')
 
 except ConnectionRefusedError:
     print(f'[ERRO] Não foi possível conectar ao servidor {host}:{porta}. Verifique se ele está ativo.')
